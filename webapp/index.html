@@ -78,6 +78,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 }
 .nav-btn:hover { background: var(--surface2); color: var(--text); }
 .nav-btn.active { background: var(--surface2); color: var(--accent); }
+.pdf-btn {
+  padding: 6px 14px; border-radius: 6px; border: 1px solid var(--accent);
+  background: rgba(79,142,247,.12); color: var(--accent); font-size: 0.85rem;
+  font-weight: 600; text-decoration: none; transition: all .15s; white-space: nowrap;
+}
+.pdf-btn:hover { background: rgba(79,142,247,.25); }
 
 .content { flex: 1; padding: 32px 40px; max-width: 1300px; margin: 0 auto; width: 100%; }
 
@@ -302,6 +308,7 @@ table.bench-table .mono { font-family: monospace; }
       <button class="nav-btn" onclick="showPage('options',this)">Options</button>
       <button class="nav-btn" onclick="showPage('benchmarks',this)">Benchmarks</button>
       <button class="nav-btn" onclick="showPage('files',this)">Files</button>
+      <a class="pdf-btn" href="../report/LSTM_CodeGen_Report.pdf" target="_blank">📄 PDF Report</a>
     </nav>
   </div>
 
@@ -315,7 +322,10 @@ table.bench-table .mono { font-family: monospace; }
         <p>Four approaches to deploying a PyTorch LSTM model as bare-metal C on STM32F746G-Discovery.
            Benchmarked with Apple Clang 17 (gcc) at -O3 -ffast-math &mdash; 7 × 1000-run trials, seed-42 input.
            All four implementations produce identical predictions (100% match).</p>
-        <div style="margin-top:12px;">
+        <div style="margin-top:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+          <a href="../report/LSTM_CodeGen_Report.pdf" target="_blank" style="display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:8px;background:var(--accent);color:#fff;font-weight:700;font-size:0.9rem;text-decoration:none;transition:background .2s;" onmouseover="this.style.background='#3a7de8'" onmouseout="this.style.background='var(--accent)'">
+            📄 Download Full PDF Report
+          </a>
           <span class="badge badge-green">Option 1 Fastest</span>
           <span class="badge badge-blue">MATLAB Coder R2026a</span>
           <span class="badge badge-purple">100% Match All Options</span>

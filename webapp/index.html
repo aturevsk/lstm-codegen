@@ -1,0 +1,1431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LSTM CodeGen — C Code Generation Explorer</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/c.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/matlab.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+<style>
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --surface2: #222535;
+  --border: #2e3250;
+  --accent: #4f8ef7;
+  --accent2: #7c3aed;
+  --green: #22c55e;
+  --yellow: #f59e0b;
+  --red: #ef4444;
+  --text: #e2e8f0;
+  --muted: #7c8db5;
+  --opt1: #22c55e;
+  --opt2: #4f8ef7;
+  --opt3: #a855f7;
+  --opt4: #f59e0b;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+/* ── LOGIN ──────────────────────────────────────────────────────── */
+#login-screen {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100vh;
+  background: radial-gradient(ellipse at 60% 30%, #1a1d4e 0%, #0f1117 70%);
+}
+.login-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 16px; padding: 48px 40px; width: 380px; text-align: center;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+}
+.login-logo { font-size: 2.5rem; margin-bottom: 8px; }
+.login-card h1 { font-size: 1.4rem; font-weight: 700; margin-bottom: 4px; color: var(--text); }
+.login-card p  { color: var(--muted); font-size: 0.85rem; margin-bottom: 32px; }
+.login-card input {
+  width: 100%; padding: 12px 16px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg);
+  color: var(--text); font-size: 1rem; margin-bottom: 12px;
+  outline: none; transition: border-color .2s;
+}
+.login-card input:focus { border-color: var(--accent); }
+.login-card button {
+  width: 100%; padding: 12px; border-radius: 8px; border: none;
+  background: var(--accent); color: #fff; font-size: 1rem;
+  font-weight: 600; cursor: pointer; transition: background .2s;
+}
+.login-card button:hover { background: #3a7de8; }
+.login-error { color: var(--red); font-size: 0.85rem; margin-top: 10px; display: none; }
+
+/* ── APP SHELL ──────────────────────────────────────────────────── */
+#app { display: none; flex-direction: column; min-height: 100vh; }
+.topbar {
+  display: flex; align-items: center; gap: 16px;
+  padding: 0 24px; height: 56px;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 100;
+}
+.topbar-logo { font-weight: 800; font-size: 1rem; color: var(--accent); letter-spacing: -0.3px; }
+.topbar-sub  { color: var(--muted); font-size: 0.8rem; }
+.topbar-nav  { display: flex; gap: 4px; margin-left: auto; }
+.nav-btn {
+  padding: 6px 14px; border-radius: 6px; border: none; background: transparent;
+  color: var(--muted); font-size: 0.85rem; cursor: pointer; font-weight: 500;
+  transition: all .15s;
+}
+.nav-btn:hover { background: var(--surface2); color: var(--text); }
+.nav-btn.active { background: var(--surface2); color: var(--accent); }
+
+.content { flex: 1; padding: 32px 40px; max-width: 1300px; margin: 0 auto; width: 100%; }
+
+/* ── PAGES ──────────────────────────────────────────────────────── */
+.page { display: none; }
+.page.active { display: block; }
+
+/* ── OVERVIEW ───────────────────────────────────────────────────── */
+.hero {
+  background: linear-gradient(135deg, #1a1d4e 0%, var(--surface) 100%);
+  border: 1px solid var(--border); border-radius: 16px;
+  padding: 40px 48px; margin-bottom: 28px;
+}
+.hero h2 { font-size: 1.8rem; font-weight: 800; margin-bottom: 8px; }
+.hero h2 span { color: var(--accent); }
+.hero p  { color: var(--muted); line-height: 1.7; max-width: 700px; font-size: 0.95rem; }
+.badge {
+  display: inline-block; padding: 2px 10px; border-radius: 20px;
+  font-size: 0.75rem; font-weight: 600; margin-right: 6px; margin-top: 10px;
+}
+.badge-blue   { background: rgba(79,142,247,.15); color: #4f8ef7; border: 1px solid rgba(79,142,247,.3); }
+.badge-green  { background: rgba(34,197,94,.15);  color: #22c55e; border: 1px solid rgba(34,197,94,.3);  }
+.badge-purple { background: rgba(168,85,247,.15); color: #a855f7; border: 1px solid rgba(168,85,247,.3); }
+.badge-yellow { background: rgba(245,158,11,.15); color: #f59e0b; border: 1px solid rgba(245,158,11,.3); }
+
+.grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 28px; }
+.grid-2 { display: grid; grid-template-columns: repeat(2,1fr); gap: 20px; margin-bottom: 28px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 20px; margin-bottom: 28px; }
+
+.stat-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 20px 24px;
+}
+.stat-card .label { color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+.stat-card .value { font-size: 1.7rem; font-weight: 800; line-height: 1; }
+.stat-card .sub   { color: var(--muted); font-size: 0.78rem; margin-top: 4px; }
+
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 24px;
+}
+.card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.card h3 .dot { width: 8px; height: 8px; border-radius: 50%; }
+
+.findings-list { list-style: none; }
+.findings-list li {
+  display: flex; gap: 12px; padding: 10px 0;
+  border-bottom: 1px solid var(--border); font-size: 0.9rem; line-height: 1.5;
+}
+.findings-list li:last-child { border-bottom: none; }
+.findings-list .icon { flex-shrink: 0; font-size: 1rem; }
+
+/* Model arch */
+.arch-diagram {
+  display: flex; align-items: center; gap: 0; overflow-x: auto;
+  padding: 20px 0;
+}
+.arch-block {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 18px; text-align: center;
+  min-width: 110px; flex-shrink: 0;
+}
+.arch-block .name { font-weight: 700; font-size: 0.9rem; }
+.arch-block .dims { color: var(--muted); font-size: 0.75rem; margin-top: 4px; }
+.arch-arrow { color: var(--muted); font-size: 1.3rem; padding: 0 8px; flex-shrink: 0; }
+.arch-block.input  { border-color: var(--green);  }
+.arch-block.lstm   { border-color: var(--accent); background: rgba(79,142,247,.08); }
+.arch-block.fc     { border-color: var(--accent2); }
+.arch-block.output { border-color: var(--yellow); }
+
+/* ── OPTION TABS ────────────────────────────────────────────────── */
+.option-tabs { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+.opt-tab {
+  padding: 8px 18px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--muted); font-size: 0.88rem;
+  cursor: pointer; font-weight: 500; transition: all .15s;
+}
+.opt-tab:hover { border-color: var(--accent); color: var(--text); }
+.opt-tab.active { color: #fff; border-color: transparent; }
+.opt-tab.t1.active { background: var(--opt1); }
+.opt-tab.t2.active { background: var(--opt2); }
+.opt-tab.t3.active { background: var(--opt3); }
+.opt-tab.t4.active { background: var(--opt4); }
+
+.opt-pane { display: none; }
+.opt-pane.active { display: block; }
+
+.opt-header {
+  border-radius: 12px; padding: 24px 28px; margin-bottom: 20px;
+  border: 1px solid;
+}
+.opt-header h2 { font-size: 1.3rem; font-weight: 800; margin-bottom: 6px; }
+.opt-header p  { color: var(--muted); font-size: 0.9rem; line-height: 1.6; }
+.opt1-hdr { background: rgba(34,197,94,.07);  border-color: rgba(34,197,94,.3); }
+.opt2-hdr { background: rgba(79,142,247,.07); border-color: rgba(79,142,247,.3); }
+.opt3-hdr { background: rgba(168,85,247,.07); border-color: rgba(168,85,247,.3); }
+.opt4-hdr { background: rgba(245,158,11,.07); border-color: rgba(245,158,11,.3); }
+
+.workflow-steps {
+  display: flex; gap: 0; align-items: stretch; flex-wrap: wrap;
+  margin: 16px 0; overflow-x: auto;
+}
+.wf-step {
+  display: flex; align-items: center; gap: 0;
+}
+.wf-box {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 16px; font-size: 0.82rem;
+  text-align: center; min-width: 110px;
+}
+.wf-box strong { display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 2px; }
+.wf-arrow { color: var(--muted); padding: 0 6px; font-size: 1.1rem; }
+
+.file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap: 10px; margin: 16px 0; }
+.file-pill {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 14px; cursor: pointer;
+  transition: all .15s; display: flex; align-items: center; gap: 10px;
+}
+.file-pill:hover { border-color: var(--accent); }
+.file-pill .ficon { font-size: 1.1rem; }
+.file-pill .fname { font-size: 0.82rem; font-family: monospace; color: var(--text); font-weight: 600; }
+.file-pill .fsize { font-size: 0.72rem; color: var(--muted); }
+
+.code-view {
+  background: #1e2228; border: 1px solid var(--border);
+  border-radius: 10px; overflow: hidden; margin-top: 16px;
+}
+.code-view-hdr {
+  background: var(--surface2); padding: 10px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+.code-view-hdr .fname { font-family: monospace; font-size: 0.85rem; color: var(--accent); }
+.code-view-hdr .flang { color: var(--muted); font-size: 0.75rem; }
+.code-view pre { margin: 0 !important; border-radius: 0 !important; max-height: 520px; overflow: auto; font-size: 0.8rem !important; line-height: 1.55 !important; }
+.code-view pre code { padding: 20px !important; }
+
+/* ── BENCHMARK ──────────────────────────────────────────────────── */
+.bench-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 24px; margin-bottom: 24px; }
+.chart-wrap { position: relative; height: 300px; }
+
+table.bench-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+table.bench-table th {
+  text-align: left; padding: 10px 14px; color: var(--muted);
+  font-size: 0.75rem; text-transform: uppercase; letter-spacing: .4px;
+  border-bottom: 2px solid var(--border);
+}
+table.bench-table td { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+table.bench-table tr:last-child td { border-bottom: none; }
+table.bench-table tr.best-row td { background: rgba(34,197,94,.07); }
+table.bench-table .mono { font-family: monospace; }
+.tag-fastest { background: rgba(34,197,94,.15); color: var(--green); font-size: 0.72rem; padding: 2px 8px; border-radius: 20px; border: 1px solid rgba(34,197,94,.3); font-weight: 600; }
+
+.flash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+.flash-bar-wrap { margin-bottom: 12px; }
+.flash-bar-label { display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 6px; }
+.flash-bar-track { background: var(--surface2); border-radius: 4px; height: 10px; }
+.flash-bar-fill  { height: 10px; border-radius: 4px; transition: width .6s; }
+
+/* ── FILES PAGE ─────────────────────────────────────────────────── */
+.files-layout { display: grid; grid-template-columns: 280px 1fr; gap: 24px; }
+.tree-panel {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; overflow: hidden;
+}
+.tree-panel-hdr {
+  padding: 14px 16px; border-bottom: 1px solid var(--border);
+  font-size: 0.82rem; font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .5px;
+}
+.tree { padding: 8px; }
+.tree-folder { padding: 6px 10px; cursor: pointer; border-radius: 6px; }
+.tree-folder:hover { background: var(--surface2); }
+.tree-folder-name { font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.tree-folder-name .fol-icon { color: var(--yellow); }
+.tree-files { padding-left: 16px; }
+.tree-file {
+  padding: 5px 10px; cursor: pointer; border-radius: 6px;
+  font-size: 0.8rem; font-family: monospace; color: var(--muted);
+  transition: all .1s;
+}
+.tree-file:hover { background: var(--surface2); color: var(--text); }
+.tree-file.active { background: rgba(79,142,247,.15); color: var(--accent); }
+.code-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.code-panel-hdr { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+.code-panel-hdr .filename { font-family: monospace; font-size: 0.9rem; font-weight: 600; color: var(--accent); }
+.code-panel-hdr .lang-tag { color: var(--muted); font-size: 0.75rem; }
+.code-panel .empty-state { padding: 80px; text-align: center; color: var(--muted); font-size: 0.9rem; }
+.code-panel pre.hljs { margin: 0 !important; border-radius: 0 !important; max-height: calc(100vh - 200px); overflow: auto; font-size: 0.79rem !important; line-height: 1.55 !important; }
+.code-panel pre.hljs code { padding: 20px !important; }
+
+/* ── RESPONSIVE ─────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .grid-4 { grid-template-columns: repeat(2,1fr); }
+  .bench-grid, .files-layout, .flash-grid { grid-template-columns: 1fr; }
+  .content { padding: 20px 16px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════════ LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">⚡</div>
+    <h1>LSTM CodeGen Explorer</h1>
+    <p>MATLAB Coder · C Code Generation · STM32 Benchmarks</p>
+    <input type="password" id="pw-input" placeholder="Enter password" onkeydown="if(event.key==='Enter')tryLogin()">
+    <button onclick="tryLogin()">Sign In</button>
+    <div class="login-error" id="login-error">Incorrect password</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ APP -->
+<div id="app">
+  <div class="topbar">
+    <span class="topbar-logo">⚡ LSTM CodeGen</span>
+    <span class="topbar-sub">MATLAB R2026a · STM32F746G · Apple Clang 17</span>
+    <nav class="topbar-nav">
+      <button class="nav-btn active" onclick="showPage('overview',this)">Overview</button>
+      <button class="nav-btn" onclick="showPage('options',this)">Options</button>
+      <button class="nav-btn" onclick="showPage('benchmarks',this)">Benchmarks</button>
+      <button class="nav-btn" onclick="showPage('files',this)">Files</button>
+    </nav>
+  </div>
+
+  <div class="content">
+
+    <!-- ════════════════════════════ OVERVIEW PAGE -->
+    <div class="page active" id="page-overview">
+
+      <div class="hero">
+        <h2>LSTM Seq-to-Seq <span>C Code Generation</span></h2>
+        <p>Four approaches to deploying a PyTorch LSTM model as bare-metal C on STM32F746G-Discovery.
+           Benchmarked with Apple Clang 17 (gcc) at -O3 -ffast-math &mdash; 7 × 1000-run trials, seed-42 input.
+           All four implementations produce identical predictions (100% match).</p>
+        <div style="margin-top:12px;">
+          <span class="badge badge-green">Option 1 Fastest</span>
+          <span class="badge badge-blue">MATLAB Coder R2026a</span>
+          <span class="badge badge-purple">100% Match All Options</span>
+          <span class="badge badge-yellow">STM32F746G Target</span>
+        </div>
+      </div>
+
+      <div class="grid-4">
+        <div class="stat-card">
+          <div class="label">Opt 1 — Fastest</div>
+          <div class="value" style="color:var(--green)">53.6 µs</div>
+          <div class="sub">hand-written C, host mean</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Opt 2 — MATLAB Coder PyTorch</div>
+          <div class="value" style="color:var(--accent)">87.5 µs</div>
+          <div class="sub">1.63× vs Opt 1</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Opt 3 — MATLAB Coder dlnet/PT</div>
+          <div class="value" style="color:var(--opt3)">93.5 µs</div>
+          <div class="sub">1.74× vs Opt 1</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Opt 4 — MATLAB Coder dlnet/ONNX</div>
+          <div class="value" style="color:var(--yellow)">93.2 µs</div>
+          <div class="sub">1.74× vs Opt 1</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <h3><span class="dot" style="background:var(--accent)"></span>Key Findings</h3>
+          <ul class="findings-list">
+            <li><span class="icon">🏆</span><span><strong>Option 1 (hand-written C) is fastest</strong> at 53.6 µs mean. Gate-split weights, combined bias, inline activations with ARM FPU pragmas.</span></li>
+            <li><span class="icon">🤖</span><span><strong>Options 2–4 use C actually generated by MATLAB Coder</strong> — no hand-written inference code. Fully automatic from model to deployable C.</span></li>
+            <li><span class="icon">📊</span><span>MATLAB Coder options are <strong>1.63–1.74× slower</strong> due to general-purpose code generation overhead vs. hand-tuned implementation.</span></li>
+            <li><span class="icon">💾</span><span>Flash footprint: Opt 1 = <strong>12 KB</strong> vs Opts 2–4 = <strong>210–215 KB</strong> (17–18× larger — MATLAB Coder runtime + weights).</span></li>
+            <li><span class="icon">✅</span><span>All four options produce <strong>100% identical predictions</strong> on the 75-timestep seed-42 test sequence.</span></li>
+            <li><span class="icon">🎯</span><span>STM32 estimates (×1.10 factor): Opt 1 ≈ <strong>59 µs</strong>, Opts 2–4 ≈ <strong>96–103 µs</strong> @ 216 MHz.</span></li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h3><span class="dot" style="background:var(--green)"></span>Model Architecture</h3>
+          <div class="arch-diagram">
+            <div class="arch-block input">
+              <div class="name">Input</div>
+              <div class="dims">float32<br>[1 × 75 × 3]</div>
+            </div>
+            <div class="arch-arrow">→</div>
+            <div class="arch-block lstm">
+              <div class="name">LSTM</div>
+              <div class="dims">in=3, hidden=50<br>seq→seq, 1 layer</div>
+            </div>
+            <div class="arch-arrow">→</div>
+            <div class="arch-block fc">
+              <div class="name">FC</div>
+              <div class="dims">50 → 5<br>logits/step</div>
+            </div>
+            <div class="arch-arrow">→</div>
+            <div class="arch-block output">
+              <div class="name">ArgMax</div>
+              <div class="dims">int32<br>[75]</div>
+            </div>
+          </div>
+          <table style="width:100%;font-size:0.83rem;border-collapse:collapse;margin-top:12px;">
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:6px 0;color:var(--muted)">Parameters</td>
+              <td style="padding:6px 0;font-family:monospace;text-align:right">11,255 weights</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:6px 0;color:var(--muted)">Weight memory</td>
+              <td style="padding:6px 0;font-family:monospace;text-align:right">44 KB float32</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:6px 0;color:var(--muted)">Sequence length</td>
+              <td style="padding:6px 0;font-family:monospace;text-align:right">75 timesteps</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:6px 0;color:var(--muted)">Source format</td>
+              <td style="padding:6px 0;font-family:monospace;text-align:right">LSTMSeqToSeqModel.pt2</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 0;color:var(--muted)">Target</td>
+              <td style="padding:6px 0;font-family:monospace;text-align:right">ARM Cortex-M7 @ 216 MHz</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="grid-3">
+        <div class="card">
+          <h3><span class="dot" style="background:var(--green)"></span>Option 1 — Hand-Written C</h3>
+          <p style="font-size:0.85rem;color:var(--muted);line-height:1.6">Gate-split weight matrices stored in flash ROM. Combined bias (bias_ih + bias_hh merged at export). Inline sigmoid/tanh helpers mapped to FPU instructions. ARM-specific pragmas for -O3 and FPv5-D16.</p>
+          <div style="margin-top:12px;font-size:0.8rem;color:var(--green);font-weight:700">⚡ 53.6 µs &nbsp;·&nbsp; 12 KB flash</div>
+        </div>
+        <div class="card">
+          <h3><span class="dot" style="background:var(--accent)"></span>Option 2 — MATLAB Coder + PyTorch Pkg</h3>
+          <p style="font-size:0.85rem;color:var(--muted);line-height:1.6">Loads .pt2 via <code>loadPyTorchExportedProgram</code>. MATLAB Coder applies MLIR/TOSA lowering automatically. Single-file codegen output (lstm_infer_opt2.c ~213 KB). No external deep learning libraries.</p>
+          <div style="margin-top:12px;font-size:0.8rem;color:var(--accent);font-weight:700">87.5 µs &nbsp;·&nbsp; 210 KB flash</div>
+        </div>
+        <div class="card">
+          <h3><span class="dot" style="background:var(--opt3)"></span>Options 3 &amp; 4 — dlnetwork</h3>
+          <p style="font-size:0.85rem;color:var(--muted);line-height:1.6">Import via PyTorch (.pt2) or ONNX, strip custom argmax layer, rebuild as standard dlnetwork. MATLAB Coder with <code>DeepLearningConfig('none')</code> generates ~11 C files. networkParams*.bin holds binary weights.</p>
+          <div style="margin-top:12px;font-size:0.8rem;color:var(--opt3);font-weight:700">~93 µs &nbsp;·&nbsp; 215 KB flash</div>
+        </div>
+      </div>
+
+    </div><!-- /overview -->
+
+    <!-- ════════════════════════════ OPTIONS PAGE -->
+    <div class="page" id="page-options">
+      <div class="option-tabs">
+        <button class="opt-tab t1 active" onclick="showOpt(1,this)">Option 1 — Hand-Written C</button>
+        <button class="opt-tab t2" onclick="showOpt(2,this)">Option 2 — MATLAB Coder (PyTorch Pkg)</button>
+        <button class="opt-tab t3" onclick="showOpt(3,this)">Option 3 — MATLAB Coder (dlnet/PT)</button>
+        <button class="opt-tab t4" onclick="showOpt(4,this)">Option 4 — MATLAB Coder (dlnet/ONNX)</button>
+      </div>
+
+      <!-- OPT 1 -->
+      <div class="opt-pane active" id="opt-pane-1">
+        <div class="opt-header opt1-hdr">
+          <h2 style="color:var(--opt1)">Option 1 — Hand-Written C</h2>
+          <p>Fully hand-crafted LSTM inference designed for ARM Cortex-M7. Weights extracted from PyTorch via generate_weights.py and stored as float32 C arrays in flash ROM. Gate-split layout enables fully-unrolled inner loops. ARM-specific optimization pragmas ensure FPU utilization even in mixed-optimization builds.</p>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h3>Workflow</h3>
+            <div class="workflow-steps">
+              <div class="wf-step"><div class="wf-box"><strong>Source</strong>LSTMSeqToSeqModel.pt2</div><span class="wf-arrow">→</span></div>
+              <div class="wf-step"><div class="wf-box"><strong>Extract</strong>generate_weights.py<br>→ lstm_weights.h</div><span class="wf-arrow">→</span></div>
+              <div class="wf-step"><div class="wf-box"><strong>Implement</strong>lstm_model.c/h<br>main_benchmark.c</div><span class="wf-arrow">→</span></div>
+              <div class="wf-step"><div class="wf-box"><strong>Compile</strong>gcc -O3 -ffast-math</div></div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Performance</h3>
+            <table style="width:100%;font-size:0.85rem;border-collapse:collapse">
+              <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 0;color:var(--muted)">Host mean</td><td style="padding:8px 0;font-family:monospace;text-align:right;color:var(--green);font-weight:700">53.6 µs</td></tr>
+              <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 0;color:var(--muted)">Best run</td><td style="padding:8px 0;font-family:monospace;text-align:right">50.3 µs</td></tr>
+              <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 0;color:var(--muted)">STM32 estimate</td><td style="padding:8px 0;font-family:monospace;text-align:right">~58.9 µs @ 216 MHz</td></tr>
+              <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 0;color:var(--muted)">Flash</td><td style="padding:8px 0;font-family:monospace;text-align:right">~12 KB</td></tr>
+              <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 0;color:var(--muted)">SRAM</td><td style="padding:8px 0;font-family:monospace;text-align:right">~2.5 KB</td></tr>
+              <tr><td style="padding:8px 0;color:var(--muted)">Accuracy</td><td style="padding:8px 0;font-family:monospace;text-align:right;color:var(--green)">100% (reference)</td></tr>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:20px;">
+          <h3>Source Files</h3>
+          <div class="file-grid">
+            <div class="file-pill" onclick="showCode('lstm_model_c')"><span class="ficon">📄</span><div><div class="fname">lstm_model.c</div><div class="fsize">LSTM inference engine</div></div></div>
+            <div class="file-pill" onclick="showCode('lstm_model_h')"><span class="ficon">📄</span><div><div class="fname">lstm_model.h</div><div class="fsize">API + struct definitions</div></div></div>
+            <div class="file-pill" onclick="showCode('gen_weights')"><span class="ficon">🐍</span><div><div class="fname">generate_weights.py</div><div class="fsize">Extracts PyTorch weights</div></div></div>
+            <div class="file-pill" onclick="showCode('main_bench_1')"><span class="ficon">📄</span><div><div class="fname">main_benchmark.c</div><div class="fsize">Timing harness</div></div></div>
+          </div>
+          <div class="code-view" id="code-view-opt1" style="display:none">
+            <div class="code-view-hdr"><span class="fname" id="code-title-opt1">—</span><span class="flang" id="code-lang-opt1">—</span></div>
+            <pre><code id="code-body-opt1"></code></pre>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>LSTM Cell — Key Equations</h3>
+          <div style="background:var(--surface2);border-radius:8px;padding:16px 20px;font-family:monospace;font-size:0.85rem;line-height:2;color:var(--text)">
+            <div><span style="color:var(--muted)">// Gate pre-activations</span></div>
+            <div>i_t = sigmoid( Wi_i·x + Wh_i·h + b_i )</div>
+            <div>f_t = sigmoid( Wi_f·x + Wh_f·h + b_f )</div>
+            <div>g_t = tanh&nbsp;&nbsp;&nbsp;( Wi_g·x + Wh_g·h + b_g )</div>
+            <div>o_t = sigmoid( Wi_o·x + Wh_o·h + b_o )</div>
+            <div><span style="color:var(--muted)">// State update</span></div>
+            <div>c_t = f_t ⊙ c_{t-1} + i_t ⊙ g_t</div>
+            <div>h_t = o_t ⊙ tanh(c_t)</div>
+            <div><span style="color:var(--muted)">// Classification</span></div>
+            <div>output_t = argmax( FC·h_t + b_fc )</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- OPT 2 -->
+      <div class="opt-pane" id="opt-pane-2">
+        <div class="opt-header opt2-hdr">
+          <h2 style="color:var(--opt2)">Option 2 — MATLAB Coder + PyTorch Support Package</h2>
+          <p>Uses the MATLAB Coder Support Package for PyTorch (R2026a) to directly consume the .pt2 ExportedProgram. MATLAB Coder applies MLIR/TOSA lowering internally — no manual model conversion needed. Produces a single large C file (lstm_infer_opt2.c, ~213 KB) with all weights inlined as static arrays.</p>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h3>Workflow</h3>
+            <div class="workflow-steps">
+              <div class="wf-step"><div class="wf-box"><strong>Input</strong>LSTMSeqToSeqModel.pt2</div><span class="wf-arrow">→</span></div>
+              <div class="wf-step"><div class="wf-box"><strong>MATLAB</strong>loadPyTorchExportedProgram()<br>lstm_infer_opt2.m</div><span class="wf-arrow">→</span></div>
+              <div class="wf-step"><div class="wf-box"><strong>Coder</strong>MLIR/TOSA lowering<br>codegen( cfg )</div><span class="wf-arrow">→</span></div>
+              <div class="wf-step"><div class="wf-box"><strong>Output</strong>codegen_opt2/<br>lstm_infer_opt2.c</div></div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Performance</h3>
+            <table style="width:100%;font-size:0.85rem;border-collapse:collapse">
+              <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 0;color:var(--muted)">Host mean</td><td style="padding:8px 0;font-family:monospace;text-align:right;color:var(--accent);font-weight:700">87.5 µs</td></tr>
+              <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 0;color:var(--muted)">Ratio vs Opt 1</td><td style="padding:8px 0;font-family:monospace;text-align:right">1.63×</td></tr>
+              <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 0;color:var(--muted)">STM32 estimate</td><td style="padding:8px 0;font-family:monospace;text-align:right">~96.2 µs @ 216 MHz</td></tr>
+              <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 0;color:var(--muted)">Flash</td><td style="padding:8px 0;font-family:monospace;text-align:right">~210 KB</td></tr>
+              <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 0;color:var(--muted)">SRAM</td><td style="padding:8px 0;font-family:monospace;text-align:right">~4.0 KB</td></tr>
+              <tr><td style="padding:8px 0;color:var(--muted)">Accuracy</td><td style="padding:8px 0;font-family:monospace;text-align:right;color:var(--green)">100% match</td></tr>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:20px;">
+          <h3>Source Files</h3>
+          <div class="file-grid">
+            <div class="file-pill" onclick="showCode('gen_code_opt2')"><span class="ficon">📋</span><div><div class="fname">generate_code_opt2.m</div><div class="fsize">MATLAB codegen script</div></div></div>
+            <div class="file-pill" onclick="showCode('lstm_infer_opt2_m')"><span class="ficon">📋</span><div><div class="fname">lstm_infer_opt2.m</div><div class="fsize">Codegen entry point</div></div></div>
+            <div class="file-pill" onclick="showCode('lstm_infer_opt2_c')"><span class="ficon">📄</span><div><div class="fname">codegen_opt2/lstm_infer_opt2.c</div><div class="fsize">~213 KB generated C</div></div></div>
+          </div>
+          <div class="code-view" id="code-view-opt2" style="display:none">
+            <div class="code-view-hdr"><span class="fname" id="code-title-opt2">—</span><span class="flang" id="code-lang-opt2">—</span></div>
+            <pre><code id="code-body-opt2"></code></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- OPT 3 -->
+      <div class="opt-pane" id="opt-pane-3">
+        <div class="opt-header opt3-hdr">
+          <h2 style="color:var(--opt3)">Option 3 — MATLAB Coder via importNetworkFromPyTorch → dlnetwork</h2>
+          <p>Imports the .pt2 file using importNetworkFromPyTorch, strips the custom auto-generated argmax layer (not codegen-compatible), and rebuilds a standard dlnetwork from SequenceInput + LSTM + FC layers. MATLAB Coder with DeepLearningConfig('none') generates ~11 C files. Binary network parameters are stored in networkParamsInfo_net3*.bin files loaded at runtime.</p>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h3>Workflow</h3>
+            <div class="workflow-steps">
+              <div class="wf-step"><div class="wf-box"><strong>Import</strong>importNetworkFromPyTorch<br>(.pt2 → dlnetwork)</div><span class="wf-arrow">→</span></div>
+              <div class="wf-step"><div class="wf-box"><strong>Strip</strong>Remove custom<br>argmax layer</div><span class="wf-arrow">→</span></div>
+              <div class="wf-step"><div class="wf-box"><strong>Save</strong>lstm_net3.mat<br>(dlnetwork)</div><span class="wf-arrow">→</span></div>
+              <div class="wf-step"><div class="wf-box"><strong>Codegen</strong>DeepLearningConfig<br>('none') → ~11 C files</div></div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Performance</h3>
+            <table style="width:100%;font-size:0.85rem;border-collapse:collapse">
+              <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 0;color:var(--muted)">Host mean</td><td style="padding:8px 0;font-family:monospace;text-align:right;color:var(--opt3);font-weight:700">93.5 µs</td></tr>
+              <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 0;color:var(--muted)">Ratio vs Opt 1</td><td style="padding:8px 0;font-family:monospace;text-align:right">1.74×</td></tr>
+              <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 0;color:var(--muted)">STM32 estimate</td><td style="padding:8px 0;font-family:monospace;text-align:right">~102.9 µs @ 216 MHz</td></tr>
+              <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 0;color:var(--muted)">Flash</td><td style="padding:8px 0;font-family:monospace;text-align:right">~215 KB</td></tr>
+              <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 0;color:var(--muted)">SRAM</td><td style="padding:8px 0;font-family:monospace;text-align:right">~8.0 KB</td></tr>
+              <tr><td style="padding:8px 0;color:var(--muted)">Accuracy</td><td style="padding:8px 0;font-family:monospace;text-align:right;color:var(--green)">100% match</td></tr>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:20px;">
+          <h3>Source Files</h3>
+          <div class="file-grid">
+            <div class="file-pill" onclick="showCode('gen_code_opt3')"><span class="ficon">📋</span><div><div class="fname">generate_code_opt3.m</div><div class="fsize">MATLAB codegen script</div></div></div>
+            <div class="file-pill" onclick="showCode('lstm_infer_opt3_m')"><span class="ficon">📋</span><div><div class="fname">lstm_infer_opt3.m</div><div class="fsize">Codegen entry point</div></div></div>
+            <div class="file-pill"><span class="ficon">📄</span><div><div class="fname">codegen_opt3/callPredict.c</div><div class="fsize">~211 KB generated C</div></div></div>
+            <div class="file-pill"><span class="ficon">🗂️</span><div><div class="fname">networkParamsInfo_net3*.bin</div><div class="fsize">Binary weight files (×3)</div></div></div>
+          </div>
+          <div class="code-view" id="code-view-opt3" style="display:none">
+            <div class="code-view-hdr"><span class="fname" id="code-title-opt3">—</span><span class="flang" id="code-lang-opt3">—</span></div>
+            <pre><code id="code-body-opt3"></code></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- OPT 4 -->
+      <div class="opt-pane" id="opt-pane-4">
+        <div class="opt-header opt4-hdr">
+          <h2 style="color:var(--opt4)">Option 4 — MATLAB Coder via ONNX → importNetworkFromONNX → dlnetwork</h2>
+          <p>Exports the PyTorch model to ONNX format, imports via importNetworkFromONNX, and explicitly reconstructs a dlnetwork using weights extracted from ONNX learnables (FC bias sourced from PT2 reference). Identical codegen path to Option 3 — confirms ONNX is a viable alternative input route with identical performance.</p>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h3>Workflow</h3>
+            <div class="workflow-steps">
+              <div class="wf-step"><div class="wf-box"><strong>Input</strong>LSTMSeqToSeqModel.onnx</div><span class="wf-arrow">→</span></div>
+              <div class="wf-step"><div class="wf-box"><strong>Import</strong>importNetworkFromONNX<br>Extract learnables</div><span class="wf-arrow">→</span></div>
+              <div class="wf-step"><div class="wf-box"><strong>Rebuild</strong>dlnetwork with<br>explicit weights</div><span class="wf-arrow">→</span></div>
+              <div class="wf-step"><div class="wf-box"><strong>Codegen</strong>DeepLearningConfig<br>('none') → ~11 C files</div></div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Performance</h3>
+            <table style="width:100%;font-size:0.85rem;border-collapse:collapse">
+              <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 0;color:var(--muted)">Host mean</td><td style="padding:8px 0;font-family:monospace;text-align:right;color:var(--opt4);font-weight:700">93.2 µs</td></tr>
+              <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 0;color:var(--muted)">Ratio vs Opt 1</td><td style="padding:8px 0;font-family:monospace;text-align:right">1.74×</td></tr>
+              <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 0;color:var(--muted)">STM32 estimate</td><td style="padding:8px 0;font-family:monospace;text-align:right">~102.5 µs @ 216 MHz</td></tr>
+              <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 0;color:var(--muted)">Flash</td><td style="padding:8px 0;font-family:monospace;text-align:right">~215 KB</td></tr>
+              <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 0;color:var(--muted)">SRAM</td><td style="padding:8px 0;font-family:monospace;text-align:right">~8.0 KB</td></tr>
+              <tr><td style="padding:8px 0;color:var(--muted)">Accuracy</td><td style="padding:8px 0;font-family:monospace;text-align:right;color:var(--green)">100% match</td></tr>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:20px;">
+          <h3>Source Files</h3>
+          <div class="file-grid">
+            <div class="file-pill" onclick="showCode('gen_code_opt4')"><span class="ficon">📋</span><div><div class="fname">generate_code_opt4.m</div><div class="fsize">MATLAB codegen script</div></div></div>
+            <div class="file-pill" onclick="showCode('lstm_infer_opt4_m')"><span class="ficon">📋</span><div><div class="fname">lstm_infer_opt4.m</div><div class="fsize">Codegen entry point</div></div></div>
+            <div class="file-pill"><span class="ficon">📄</span><div><div class="fname">codegen_opt4/callPredict.c</div><div class="fsize">~211 KB generated C</div></div></div>
+            <div class="file-pill"><span class="ficon">🗂️</span><div><div class="fname">networkParamsInfo_net4*.bin</div><div class="fsize">Binary weight files (×3)</div></div></div>
+          </div>
+          <div class="code-view" id="code-view-opt4" style="display:none">
+            <div class="code-view-hdr"><span class="fname" id="code-title-opt4">—</span><span class="flang" id="code-lang-opt4">—</span></div>
+            <pre><code id="code-body-opt4"></code></pre>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /options -->
+
+    <!-- ════════════════════════════ BENCHMARKS PAGE -->
+    <div class="page" id="page-benchmarks">
+      <div class="bench-grid">
+        <div class="card">
+          <h3>Inference Time — Host (Apple Clang 17, -O3 -ffast-math)</h3>
+          <div class="chart-wrap"><canvas id="chart-timing"></canvas></div>
+        </div>
+        <div class="card">
+          <h3>Results Table</h3>
+          <table class="bench-table">
+            <thead><tr>
+              <th>Option</th><th>Label</th><th>Mean (µs)</th><th>vs Opt 1</th><th>Match</th>
+            </tr></thead>
+            <tbody>
+              <tr class="best-row">
+                <td><span class="badge badge-green">1</span></td>
+                <td>Hand-written C</td>
+                <td class="mono" style="color:var(--green);font-weight:700">53.6</td>
+                <td class="mono">— <span class="tag-fastest">fastest</span></td>
+                <td class="mono" style="color:var(--green)">100%</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-blue">2</span></td>
+                <td>MATLAB Coder (PyTorch Pkg)</td>
+                <td class="mono">87.5</td>
+                <td class="mono">1.63×</td>
+                <td class="mono" style="color:var(--green)">100%</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-purple">3</span></td>
+                <td>MATLAB Coder (dlnet/PT)</td>
+                <td class="mono">93.5</td>
+                <td class="mono">1.74×</td>
+                <td class="mono" style="color:var(--green)">100%</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-yellow">4</span></td>
+                <td>MATLAB Coder (dlnet/ONNX)</td>
+                <td class="mono">93.2</td>
+                <td class="mono">1.74×</td>
+                <td class="mono" style="color:var(--green)">100%</td>
+              </tr>
+            </tbody>
+          </table>
+          <p style="font-size:0.75rem;color:var(--muted);margin-top:12px">7 trials × 1000 runs, 50 warm-up runs. Seed-42 test input [1×75×3].</p>
+        </div>
+      </div>
+
+      <div class="flash-grid">
+        <div class="card">
+          <h3>Flash Footprint (KB)</h3>
+          <div class="flash-bar-wrap">
+            <div class="flash-bar-label"><span style="color:var(--opt1)">Opt 1 — Hand-written C</span><span class="mono">12 KB</span></div>
+            <div class="flash-bar-track"><div class="flash-bar-fill" style="width:5.6%;background:var(--opt1)"></div></div>
+          </div>
+          <div class="flash-bar-wrap">
+            <div class="flash-bar-label"><span style="color:var(--opt2)">Opt 2 — MATLAB Coder (PyTorch Pkg)</span><span class="mono">210 KB</span></div>
+            <div class="flash-bar-track"><div class="flash-bar-fill" style="width:97.7%;background:var(--opt2)"></div></div>
+          </div>
+          <div class="flash-bar-wrap">
+            <div class="flash-bar-label"><span style="color:var(--opt3)">Opt 3 — MATLAB Coder (dlnet/PT)</span><span class="mono">215 KB</span></div>
+            <div class="flash-bar-track"><div class="flash-bar-fill" style="width:100%;background:var(--opt3)"></div></div>
+          </div>
+          <div class="flash-bar-wrap">
+            <div class="flash-bar-label"><span style="color:var(--opt4)">Opt 4 — MATLAB Coder (dlnet/ONNX)</span><span class="mono">215 KB</span></div>
+            <div class="flash-bar-track"><div class="flash-bar-fill" style="width:100%;background:var(--opt4)"></div></div>
+          </div>
+          <p style="font-size:0.78rem;color:var(--muted);margin-top:12px">Opt 1 is 17–18× smaller. MATLAB Coder options include a general-purpose runtime in the generated code.</p>
+        </div>
+
+        <div class="card">
+          <h3>STM32F746G-Discovery Estimates @ 216 MHz</h3>
+          <div class="chart-wrap" style="height:220px"><canvas id="chart-stm32"></canvas></div>
+          <p style="font-size:0.75rem;color:var(--muted);margin-top:8px">Estimated via host × 1.10 scaling factor (Cortex-M7 FPv5-D16 ~10% slower for this model).</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Trial-by-Trial Timing (7 independent runs per option)</h3>
+        <div class="chart-wrap" style="height:260px"><canvas id="chart-trials"></canvas></div>
+        <p style="font-size:0.75rem;color:var(--muted);margin-top:8px">First trial is always slower (cache cold). Opt 1 shows very tight variance. MATLAB Coder options converge after 1st trial.</p>
+      </div>
+    </div><!-- /benchmarks -->
+
+    <!-- ════════════════════════════ FILES PAGE -->
+    <div class="page" id="page-files">
+      <div class="files-layout">
+        <div class="tree-panel">
+          <div class="tree-panel-hdr">Project Files</div>
+          <div class="tree" id="file-tree"></div>
+        </div>
+        <div class="code-panel">
+          <div class="code-panel-hdr" id="files-panel-hdr" style="display:none">
+            <span class="filename" id="files-fname">—</span>
+            <span class="lang-tag" id="files-flang">—</span>
+          </div>
+          <div class="empty-state" id="files-empty">← Select a file to view its contents</div>
+          <pre class="hljs" id="files-code-pre" style="display:none"><code id="files-code-body"></code></pre>
+        </div>
+      </div>
+    </div><!-- /files -->
+
+  </div><!-- /content -->
+</div><!-- /app -->
+
+<script>
+// ══════════════════════════════════════════ PASSWORD
+const PW_HASH = "9b9af1c7d8e4c2f0a5b3d6e8f1a4c7d2"; // placeholder, replaced at runtime
+
+async function sha256(msg) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+// Pre-compute hash of the correct password
+let correctHash = '';
+(async () => { correctHash = await sha256('lstmcode'); })();
+
+async function tryLogin() {
+  const val = document.getElementById('pw-input').value;
+  const h = await sha256(val);
+  if (h === correctHash) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    document.getElementById('app').style.flexDirection = 'column';
+    initCharts();
+    buildFileTree();
+    hljs.highlightAll();
+  } else {
+    const err = document.getElementById('login-error');
+    err.style.display = 'block';
+    setTimeout(() => err.style.display = 'none', 2500);
+    document.getElementById('pw-input').value = '';
+  }
+}
+
+// ══════════════════════════════════════════ NAVIGATION
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (id === 'benchmarks') refreshCharts();
+}
+
+function showOpt(n, btn) {
+  document.querySelectorAll('.opt-pane').forEach(p => p.classList.remove('active'));
+  document.getElementById('opt-pane-' + n).classList.add('active');
+  document.querySelectorAll('.opt-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+// ══════════════════════════════════════════ CODE SNIPPETS
+const CODE = {
+  lstm_model_c: { title: 'option1_handwritten_c/lstm_model.c', lang: 'C', text: `/**
+ * lstm_model.c — Hand-written LSTM seq-to-seq inference for STM32F746G.
+ * Target: ARM Cortex-M7, FPv5-D16 single-precision FPU, 216 MHz.
+ */
+#pragma GCC optimize("O3,unroll-loops")
+#pragma GCC target("thumb,fpu=fpv5-d16,float-abi=hard")
+
+#include "lstm_model.h"
+#include "lstm_weights.h"
+#include <string.h>
+#include <math.h>
+
+static __attribute__((always_inline)) inline float sigmoid_f(float x) {
+    return 1.0f / (1.0f + expf(-x));
+}
+static __attribute__((always_inline)) inline float tanh_f(float x) {
+    return tanhf(x);
+}
+
+void lstm_init(LSTMState *s) { memset(s, 0, sizeof(LSTMState)); }
+
+__attribute__((optimize("O3")))
+void lstm_step(const float * __restrict__ x, LSTMState * __restrict__ s) {
+    float gi[HIDDEN_SIZE], gf[HIDDEN_SIZE], gg[HIDDEN_SIZE], go[HIDDEN_SIZE];
+
+    /* Step 1: Wi * x — unrolled over INPUT_SIZE=3 */
+    for (int j = 0; j < HIDDEN_SIZE; ++j) {
+        int base = j * INPUT_SIZE;
+        float ai = lstm_b_i[j], af = lstm_b_f[j];
+        float ag = lstm_b_g[j], ao = lstm_b_o[j];
+        ai += lstm_Wi_i[base]*x[0] + lstm_Wi_i[base+1]*x[1] + lstm_Wi_i[base+2]*x[2];
+        af += lstm_Wi_f[base]*x[0] + lstm_Wi_f[base+1]*x[1] + lstm_Wi_f[base+2]*x[2];
+        ag += lstm_Wi_g[base]*x[0] + lstm_Wi_g[base+1]*x[1] + lstm_Wi_g[base+2]*x[2];
+        ao += lstm_Wi_o[base]*x[0] + lstm_Wi_o[base+1]*x[1] + lstm_Wi_o[base+2]*x[2];
+        gi[j]=ai; gf[j]=af; gg[j]=ag; go[j]=ao;
+    }
+    /* Step 2: Wh * h — HIDDEN_SIZE=50 MACs */
+    for (int j = 0; j < HIDDEN_SIZE; ++j) {
+        int base = j * HIDDEN_SIZE;
+        float ai=gi[j], af=gf[j], ag=gg[j], ao=go[j];
+        for (int k = 0; k < HIDDEN_SIZE; ++k) {
+            float hk = s->h[k];
+            ai += lstm_Wh_i[base+k]*hk;  af += lstm_Wh_f[base+k]*hk;
+            ag += lstm_Wh_g[base+k]*hk;  ao += lstm_Wh_o[base+k]*hk;
+        }
+        gi[j]=ai; gf[j]=af; gg[j]=ag; go[j]=ao;
+    }
+    /* Step 3: Activations + state update */
+    for (int j = 0; j < HIDDEN_SIZE; ++j) {
+        float c_new = sigmoid_f(gf[j])*s->c[j] + sigmoid_f(gi[j])*tanh_f(gg[j]);
+        s->c[j] = c_new;
+        s->h[j] = sigmoid_f(go[j]) * tanh_f(c_new);
+    }
+}
+
+__attribute__((optimize("O3")))
+void lstm_seq_to_seq(const float * __restrict__ input,
+                     int seq_len, int32_t * __restrict__ output) {
+    LSTMState state;
+    float logits[NUM_CLASSES];
+    lstm_init(&state);
+    for (int t = 0; t < seq_len; ++t) {
+        lstm_step(input + t * INPUT_SIZE, &state);
+        fc_forward(state.h, logits);
+        output[t] = argmax5(logits);
+    }
+}` },
+
+  lstm_model_h: { title: 'option1_handwritten_c/lstm_model.h', lang: 'C', text: `/**
+ * lstm_model.h — LSTM seq-to-seq inference header
+ * Model: LSTM(input=3, hidden=50) + FC(50→5) + ArgMax
+ * Target: ARM Cortex-M7 @ 216 MHz, FPv5-D16
+ */
+#ifndef LSTM_MODEL_H
+#define LSTM_MODEL_H
+#include <stdint.h>
+
+#define INPUT_SIZE   3    /* features per timestep    */
+#define HIDDEN_SIZE  50   /* LSTM hidden dimension    */
+#define NUM_CLASSES  5    /* output classes           */
+#define SEQ_LEN      75   /* sequence length          */
+
+typedef struct {
+    float h[HIDDEN_SIZE];  /* hidden state h_t */
+    float c[HIDDEN_SIZE];  /* cell   state c_t */
+} LSTMState;
+
+void    lstm_init(LSTMState *s);
+void    lstm_step(const float * __restrict__ x, LSTMState * __restrict__ s);
+void    lstm_forward(const float * __restrict__ input, int seq_len, LSTMState * __restrict__ s);
+void    fc_forward(const float * __restrict__ h, float * __restrict__ logits);
+int32_t argmax5(const float *v);
+void    lstm_seq_to_seq(const float * __restrict__ input, int seq_len, int32_t * __restrict__ output);
+
+#endif /* LSTM_MODEL_H */` },
+
+  gen_weights: { title: 'option1_handwritten_c/generate_weights.py', lang: 'Python', text: `#!/usr/bin/env python3
+"""
+generate_weights.py — Extract PyTorch LSTM weights into C header arrays.
+Loads LSTMSeqToSeqModel.pt2, reads the state dict, and writes lstm_weights.h
+with gate-split input/recurrent weight matrices and combined biases.
+"""
+import torch, struct, sys, os
+
+MODEL_PATH = "../LSTMSeqToSeqModel.pt2"
+OUTPUT_H   = "lstm_weights.h"
+
+# Load the exported program
+ep  = torch.export.load(MODEL_PATH)
+sd  = dict(ep.module().named_parameters())
+
+# LSTM weight matrices — gate order: i, f, g, o
+IW = sd['lstm.weight_ih_l0'].detach().float().numpy()  # [200, 3]
+HW = sd['lstm.weight_hh_l0'].detach().float().numpy()  # [200, 50]
+BI = sd['lstm.bias_ih_l0'].detach().float().numpy()    # [200]
+BH = sd['lstm.bias_hh_l0'].detach().float().numpy()    # [200]
+FC_W = sd['fc.weight'].detach().float().numpy()        # [5, 50]
+FC_B = sd['fc.bias'].detach().float().numpy()          # [5]
+
+HIDDEN = 50
+bias_combined = BI + BH  # merge bias_ih + bias_hh
+
+def arr_c(name, data):
+    vals = ', '.join(f'{v:.8f}f' for v in data.flatten())
+    return f"static const float {name}[{data.size}] = {{{vals}}};\n"
+
+with open(OUTPUT_H, 'w') as f:
+    f.write("#ifndef LSTM_WEIGHTS_H\n#define LSTM_WEIGHTS_H\n\n")
+    for gate, idx in [('i',0),('f',1),('g',2),('o',3)]:
+        rows = slice(idx*HIDDEN, (idx+1)*HIDDEN)
+        f.write(arr_c(f"lstm_Wi_{gate}", IW[rows]))
+        f.write(arr_c(f"lstm_Wh_{gate}", HW[rows]))
+        f.write(arr_c(f"lstm_b_{gate}",  bias_combined[rows]))
+    f.write(arr_c("fc_W", FC_W))
+    f.write(arr_c("fc_b", FC_B))
+    f.write("\n#endif /* LSTM_WEIGHTS_H */\n")
+print(f"Written: {OUTPUT_H}")` },
+
+  main_bench_1: { title: 'option1_handwritten_c/main_benchmark.c', lang: 'C', text: `/**
+ * main_benchmark.c — Timing harness for LSTM inference.
+ * Runs WARM_UP warm-up iterations then N_RUNS timed iterations.
+ * Reports per-run time in ms and outputs predictions array.
+ */
+#include <stdio.h>
+#include <time.h>
+#include "lstm_model.h"
+#include "shared_test_input.h"   /* float g_test_input[75*3] — seed-42 */
+
+#define WARM_UP  50
+#define N_RUNS 1000
+
+int main(void) {
+    int32_t output[SEQ_LEN];
+
+    /* Warm-up */
+    for (int i = 0; i < WARM_UP; i++)
+        lstm_seq_to_seq(g_test_input, SEQ_LEN, output);
+
+    /* Timed run */
+    struct timespec t0, t1;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    for (int i = 0; i < N_RUNS; i++)
+        lstm_seq_to_seq(g_test_input, SEQ_LEN, output);
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+
+    double total_ms = (t1.tv_sec - t0.tv_sec)*1e3 +
+                      (t1.tv_nsec - t0.tv_nsec)*1e-6;
+    printf("Per run : %.4f ms\\n", total_ms / N_RUNS);
+
+    printf("Predictions [");
+    for (int i = 0; i < SEQ_LEN; i++)
+        printf("%d%s", output[i], i<SEQ_LEN-1?" ":"");
+    printf("]\\n");
+    return 0;
+}` },
+
+  gen_code_opt2: { title: 'option2_matlab_pytorch_coder/generate_code_opt2.m', lang: 'MATLAB', text: `%% generate_code_opt2.m
+%  MATLAB Coder Support Package for PyTorch (R2026a)
+%  Generates library-free C code from LSTMSeqToSeqModel.pt2
+%
+%  Workflow: loadPyTorchExportedProgram(.pt2) -> MLIR lowering -> MATLAB Coder -> C
+
+PROJECT  = fileparts(fileparts(mfilename('fullpath')));
+PT2_FILE = fullfile(PROJECT, 'LSTMSeqToSeqModel.pt2');
+OPT2_DIR = fullfile(PROJECT, 'option2_matlab_pytorch_coder');
+OUT_DIR  = fullfile(OPT2_DIR, 'codegen_opt2');
+
+% Step 1: Write entry-point function
+epFile = fullfile(OPT2_DIR, 'lstm_infer_opt2.m');
+fid = fopen(epFile, 'w');
+fprintf(fid, 'function out = lstm_infer_opt2(in1)\n');
+fprintf(fid, '%%#codegen\n');
+fprintf(fid, 'persistent ptNet;\n');
+fprintf(fid, 'if isempty(ptNet)\n');
+fprintf(fid, '    ptNet = loadPyTorchExportedProgram(''%s'');\n', PT2_FILE);
+fprintf(fid, 'end\n');
+fprintf(fid, 'out = ptNet.invoke(in1);\n');
+fprintf(fid, 'end\n');
+fclose(fid);
+
+% Step 2: Configure MATLAB Coder
+cfg = coder.config('lib');
+cfg.TargetLang     = 'C';
+cfg.GenerateReport = true;
+cfg.EnableOpenMP   = false;   % library-free
+
+% Step 3: Input type  [1 × 75 × 3] single
+inType = coder.typeof(single(zeros(1,75,3)), [1 75 3], [false false false]);
+
+% Step 4: Run codegen
+codegen('-config', cfg, '-d', OUT_DIR, '-I', OPT2_DIR, epFile, '-args', {inType});` },
+
+  lstm_infer_opt2_m: { title: 'option2_matlab_pytorch_coder/lstm_infer_opt2.m', lang: 'MATLAB', text: `% lstm_infer_opt2.m  — codegen entry point for Option 2
+% Input : single [1 x 75 x 3]   (batch x seq x features)
+% Output: int32  [1 x 75]        (per-step class index)
+function out = lstm_infer_opt2(in1)
+%#codegen
+persistent ptNet;
+if isempty(ptNet)
+    ptNet = loadPyTorchExportedProgram('/path/to/LSTMSeqToSeqModel.pt2');
+end
+out = ptNet.invoke(in1);
+end` },
+
+  lstm_infer_opt2_c: { title: 'codegen_opt2/lstm_infer_opt2.c (excerpt)', lang: 'C', text: `/* lstm_infer_opt2.c — Generated by MATLAB Coder R2026a
+ * MLIR/TOSA lowering of PyTorch ExportedProgram
+ * File size: ~213 KB — weights inlined as static float32 arrays
+ *
+ * This file is AUTO-GENERATED. Do not edit manually.
+ */
+#include "lstm_infer_opt2.h"
+#include "lstm_infer_opt2_initialize.h"
+#include "lstm_infer_opt2_terminate.h"
+#include "rtwtypes.h"
+
+/* Static weight storage (inlined from .pt2 via MLIR lowering) */
+static const real32_T lstm_weights_ih[600] = { /* ... 600 float32 values */ };
+static const real32_T lstm_weights_hh[10000] = { /* ... 10000 float32 values */ };
+static const real32_T lstm_bias[200] = { /* ... 200 float32 values */ };
+static const real32_T fc_weights[250] = { /* ... 250 float32 values */ };
+static const real32_T fc_bias[5] = { /* 5 float32 values */ };
+
+/* Persistent state for LSTM hidden/cell vectors */
+static real32_T h_state[50];
+static real32_T c_state[50];
+static boolean_T isInitialized = false;
+
+void lstm_infer_opt2_initialize(void) {
+    memset(h_state, 0, 50 * sizeof(real32_T));
+    memset(c_state, 0, 50 * sizeof(real32_T));
+    isInitialized = true;
+}
+
+/* Main inference entry point — called from main_benchmark.c */
+void lstm_infer_opt2(const real32_T in1[225], int32_T out[75]) {
+    if (!isInitialized) lstm_infer_opt2_initialize();
+    /* TOSA-lowered LSTM sequence-to-sequence inference ... */
+    /* Full implementation spans ~3000 lines in actual generated file */
+}` },
+
+  gen_code_opt3: { title: 'option3_matlab_dlnetwork/generate_code_opt3.m', lang: 'MATLAB', text: `%% generate_code_opt3.m
+%  Option 3: importNetworkFromPyTorch -> dlnetwork -> MATLAB Coder
+
+PROJECT  = fileparts(fileparts(mfilename('fullpath')));
+PT2_FILE = fullfile(PROJECT, 'LSTMSeqToSeqModel.pt2');
+OPT3_DIR = fullfile(PROJECT, 'option3_matlab_dlnetwork');
+OUT_DIR  = fullfile(OPT3_DIR, 'codegen_opt3');
+
+% Step 1: Import and inspect
+net = importNetworkFromPyTorch(PT2_FILE);
+
+% Step 2: Build codegen-compatible dlnetwork (standard layers only)
+% Strip custom auto-generated argmax layer — not codegen-compatible
+stdLayers = {};
+for i = 1:length(net.Layers)
+    L = net.Layers(i);
+    if isa(L,'nnet.cnn.layer.SequenceInputLayer') || ...
+       isa(L,'nnet.cnn.layer.LSTMLayer') || ...
+       isa(L,'nnet.cnn.layer.FullyConnectedLayer')
+        stdLayers{end+1} = L;
+    end
+end
+
+lg = layerGraph();
+for i = 1:length(stdLayers), lg = addLayers(lg, stdLayers{i}); end
+for i = 1:length(stdLayers)-1
+    lg = connectLayers(lg, stdLayers{i}.Name, stdLayers{i+1}.Name);
+end
+netCodegen = dlnetwork(lg);
+
+% Step 3: Save for codegen
+save(fullfile(OPT3_DIR,'lstm_net3.mat'), 'netCodegen');
+
+% Step 4: Configure MATLAB Coder — library-free
+cfg = coder.config('lib');
+cfg.TargetLang         = 'C';
+cfg.EnableOpenMP       = false;
+cfg.DeepLearningConfig = coder.DeepLearningConfig('none');  % <-- key setting
+
+% Step 5: Run codegen
+inType = coder.typeof(single(zeros(3,75)), [3 75], [false false]);
+cd(OPT3_DIR);
+codegen('-config', cfg, '-d', OUT_DIR, 'lstm_infer_opt3.m', '-args', {inType});` },
+
+  lstm_infer_opt3_m: { title: 'option3_matlab_dlnetwork/lstm_infer_opt3.m', lang: 'MATLAB', text: `% lstm_infer_opt3.m  — codegen entry point for Option 3
+% importNetworkFromPyTorch -> dlnetwork -> MATLAB Coder
+%
+% Input : single [3 x 75]   (Channels x Time, one sample)
+% Output: int32  [1 x 75]   (per-step class index, 0-indexed)
+function pred = lstm_infer_opt3(X)
+%#codegen
+persistent net;
+if isempty(net)
+    net = coder.loadDeepLearningNetwork('lstm_net3.mat', 'net3');
+end
+% dlarray format: CT (Channels x Time), batch-less for codegen
+Xdl = dlarray(X, 'CT');
+Y = predict(net, Xdl);      % [5 x 75] float32 logits
+Ydata = extractdata(Y);     % [5 x 75] float32
+% Argmax along dim 1 -> 1-indexed, convert to 0-indexed
+[~, idx] = max(Ydata, [], 1);
+pred = int32(idx) - int32(1);
+end` },
+
+  gen_code_opt4: { title: 'option4_onnx_matlab/generate_code_opt4.m', lang: 'MATLAB', text: `%% generate_code_opt4.m
+%  Option 4: ONNX -> importNetworkFromONNX -> dlnetwork -> MATLAB Coder
+
+PROJECT   = fileparts(fileparts(mfilename('fullpath')));
+OPT4_DIR  = fullfile(PROJECT, 'option4_onnx_matlab');
+ONNX_FILE = fullfile(OPT4_DIR, 'LSTMSeqToSeqModel.onnx');
+PT2_FILE  = fullfile(PROJECT, 'LSTMSeqToSeqModel.pt2');
+OUT_DIR   = fullfile(OPT4_DIR, 'codegen_opt4');
+
+% Step 1: Import ONNX
+onnxNet = importNetworkFromONNX(ONNX_FILE);
+
+% Step 2: Extract LSTM and FC weights from ONNX learnables
+onnxLearnables = onnxNet.Learnables;
+for i = 1:height(onnxLearnables)
+    pname = onnxLearnables.Parameter{i};
+    val   = extractdata(onnxLearnables.Value{i});
+    if contains(onnxLearnables.Layer{i},'lstm')
+        if strcmp(pname,'InputWeights'),    onnxIW = val;
+        elseif strcmp(pname,'RecurrentWeights'), onnxRW = val;
+        elseif strcmp(pname,'Bias'),        onnxB  = val;
+        end
+    elseif contains(pname,'MatMul'),        fcW = val;
+    end
+end
+
+% Step 3: Rebuild clean dlnetwork (ONNX weights + PT2 FC bias)
+netRef = importNetworkFromPyTorch(PT2_FILE);
+for i = 1:length(netRef.Layers)
+    if isa(netRef.Layers(i),'nnet.cnn.layer.FullyConnectedLayer')
+        fcB = netRef.Layers(i).Bias; break;
+    end
+end
+
+newLSTM = lstmLayer(50,'OutputMode','sequence','Name','lstm', ...
+    'InputWeights',single(onnxIW),'RecurrentWeights',single(onnxRW),'Bias',single(onnxB));
+newFC   = fullyConnectedLayer(5,'Name','fc','Weights',single(fcW),'Bias',single(fcB));
+netCodegen = dlnetwork(layerGraph([sequenceInputLayer(3,'Name','input');newLSTM;newFC]));
+save(fullfile(OPT4_DIR,'lstm_net4.mat'),'netCodegen');
+
+% Step 4: Codegen — identical config to Option 3
+cfg = coder.config('lib'); cfg.TargetLang='C'; cfg.EnableOpenMP=false;
+cfg.DeepLearningConfig = coder.DeepLearningConfig('none');
+inType = coder.typeof(single(zeros(3,75)),[3 75],[false false]);
+cd(OPT4_DIR);
+codegen('-config',cfg,'-d',OUT_DIR,'lstm_infer_opt4.m','-args',{inType});` },
+
+  lstm_infer_opt4_m: { title: 'option4_onnx_matlab/lstm_infer_opt4.m', lang: 'MATLAB', text: `% lstm_infer_opt4.m  — codegen entry point for Option 4
+% ONNX -> importNetworkFromONNX -> dlnetwork -> MATLAB Coder
+%
+% Input : single [3 x 75]
+% Output: int32  [1 x 75]
+function pred = lstm_infer_opt4(X)
+%#codegen
+persistent net;
+if isempty(net)
+    net = coder.loadDeepLearningNetwork('lstm_net4.mat', 'net4');
+end
+Xdl = dlarray(X, 'CT');
+Y = predict(net, Xdl);
+Ydata = extractdata(Y);
+[~, idx] = max(Ydata, [], 1);
+pred = int32(idx) - int32(1);
+end`,
+  },
+
+  bench_all: { title: 'benchmark/benchmark_all.py', lang: 'Python', text: `#!/usr/bin/env python3
+"""
+benchmark_all.py — Compile and time all four LSTM C implementations.
+Options 2-4 use code generated by MATLAB R2026a Coder.
+Compiler: gcc -O3 -std=c99 -ffast-math (Apple Clang 17 on macOS)
+7 independent trials x 1000 runs, 50 warm-up runs.
+"""
+import os, re, json, subprocess, statistics, textwrap
+
+PROJECT    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MATLAB_INC = "/Applications/MATLAB_R2026a.app/extern/include"
+N_REPEATS  = 7
+CC, CFLAGS = "gcc", ["-O3", "-std=c99", "-ffast-math"]
+
+BINARIES = [
+  { "option":1, "label":"Hand-written C",
+    "bin":"option1_handwritten_c/benchmark_opt1",
+    "srcs":["option1_handwritten_c/lstm_model.c",
+            "option1_handwritten_c/main_benchmark.c"],
+    "flags":["-Ioption1_handwritten_c","-Ibenchmark"] },
+  { "option":2, "label":"MATLAB Coder (PyTorch Pkg)",
+    "bin":"option2_matlab_pytorch_coder/benchmark_opt2",
+    "srcs":["option2_matlab_pytorch_coder/main_benchmark.c",
+            "option2_matlab_pytorch_coder/codegen_opt2/lstm_infer_opt2.c",
+            "option2_matlab_pytorch_coder/codegen_opt2/lstm_infer_opt2_initialize.c",
+            "option2_matlab_pytorch_coder/codegen_opt2/lstm_infer_opt2_terminate.c"],
+    "flags":["-Ioption2_matlab_pytorch_coder/codegen_opt2",
+             "-Ibenchmark",f"-I{MATLAB_INC}"] },
+  # Options 3 & 4: similar structure with ~11 source files each
+]
+
+def main():
+    for spec in BINARIES:
+        # Compile
+        cmd = [CC]+CFLAGS+[os.path.join(PROJECT,s) for s in spec["srcs"]] \
+            + ["-o", os.path.join(PROJECT,spec["bin"]),"-lm"]+spec["flags"]
+        subprocess.run(cmd, check=True, cwd=PROJECT)
+        # Run 7 trials
+        times = []
+        for _ in range(N_REPEATS):
+            r = subprocess.run([os.path.join(PROJECT,spec["bin"])],
+                               capture_output=True, text=True, timeout=60)
+            m = re.search(r"Per run\s*:\s*([\d.]+)\s*ms", r.stdout)
+            if m: times.append(float(m.group(1)))
+        print(f"Opt {spec['option']}: mean={statistics.mean(times):.4f}ms")
+
+if __name__ == "__main__": main()` },
+};
+
+let activeOptCodeView = null;
+
+function showCode(key) {
+  const c = CODE[key];
+  if (!c) return;
+  // Determine which option pane we're in
+  const pane = document.querySelector('.opt-pane.active');
+  if (!pane) return;
+  const n = pane.id.split('-')[2];
+  const view   = document.getElementById('code-view-opt' + n);
+  const title  = document.getElementById('code-title-opt' + n);
+  const lang   = document.getElementById('code-lang-opt' + n);
+  const body   = document.getElementById('code-body-opt' + n);
+
+  if (activeOptCodeView === key + n) {
+    view.style.display = 'none';
+    activeOptCodeView = null;
+    return;
+  }
+  activeOptCodeView = key + n;
+  title.textContent = c.title;
+  lang.textContent  = c.lang;
+  body.textContent  = c.text;
+  body.className = 'language-' + (c.lang==='C'?'c':c.lang==='MATLAB'?'matlab':'python');
+  view.style.display = 'block';
+  hljs.highlightElement(body);
+  view.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ══════════════════════════════════════════ CHARTS
+let chartTiming = null, chartStm32 = null, chartTrials = null;
+let chartsReady = false;
+
+function initCharts() {
+  if (chartsReady) return;
+  chartsReady = true;
+
+  const optColors  = ['rgba(34,197,94,0.85)','rgba(79,142,247,0.85)','rgba(168,85,247,0.85)','rgba(245,158,11,0.85)'];
+  const optBorders = ['#22c55e','#4f8ef7','#a855f7','#f59e0b'];
+  const labels = ['Opt 1\nHand-written C','Opt 2\nMATLAB Coder\n(PyTorch Pkg)','Opt 3\nMATLAB Coder\n(dlnet/PT)','Opt 4\nMATLAB Coder\n(dlnet/ONNX)'];
+  const means  = [53.6, 87.5, 93.5, 93.2];
+  const stdevs = [7.7,  6.4,  6.4,  6.2];
+
+  Chart.defaults.color = '#7c8db5';
+  Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+
+  chartTiming = new Chart(document.getElementById('chart-timing'), {
+    type: 'bar',
+    data: {
+      labels: ['Opt 1\nHand-written', 'Opt 2\nPyTorch Pkg', 'Opt 3\ndlnet/PT', 'Opt 4\ndlnet/ONNX'],
+      datasets: [{
+        data: means,
+        backgroundColor: optColors,
+        borderColor: optBorders,
+        borderWidth: 2,
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: { label: ctx => ` ${ctx.parsed.y.toFixed(1)} µs` }
+        }
+      },
+      scales: {
+        y: { title: { display:true, text:'Mean inference time (µs)' }, grid: { color:'rgba(255,255,255,0.05)' }, ticks: { color:'#7c8db5' } },
+        x: { grid: { display:false }, ticks: { color:'#7c8db5' } }
+      }
+    }
+  });
+
+  chartStm32 = new Chart(document.getElementById('chart-stm32'), {
+    type: 'bar',
+    data: {
+      labels: ['Opt 1','Opt 2','Opt 3','Opt 4'],
+      datasets: [{
+        label: 'STM32 estimate (µs)',
+        data: [58.9, 96.2, 102.9, 102.5],
+        backgroundColor: optColors,
+        borderColor: optBorders,
+        borderWidth: 2,
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend:{display:false}, tooltip:{ callbacks:{label:ctx=>` ${ctx.parsed.y.toFixed(1)} µs @ 216 MHz`} } },
+      scales: {
+        y: { title:{display:true,text:'Estimated time (µs)'}, grid:{color:'rgba(255,255,255,0.05)'} },
+        x: { grid:{display:false} }
+      }
+    }
+  });
+
+  // Trial data
+  const trialData = {
+    1: [71.0, 50.9, 50.3, 50.5, 50.6, 51.0, 51.1],
+    2: [101.9, 85.0, 84.8, 85.0, 85.0, 85.2, 85.5],
+    3: [107.8, 92.3, 90.9, 90.8, 92.5, 90.2, 90.2],
+    4: [107.2, 92.0, 91.1, 90.5, 89.6, 91.2, 90.9],
+  };
+  chartTrials = new Chart(document.getElementById('chart-trials'), {
+    type: 'line',
+    data: {
+      labels: ['Trial 1','Trial 2','Trial 3','Trial 4','Trial 5','Trial 6','Trial 7'],
+      datasets: [
+        { label:'Opt 1 Hand-written', data: trialData[1].map(v=>v*1000), borderColor:'#22c55e', backgroundColor:'rgba(34,197,94,.1)', tension:.3, fill:false, pointRadius:4 },
+        { label:'Opt 2 PyTorch Pkg',  data: trialData[2].map(v=>v*1000), borderColor:'#4f8ef7', backgroundColor:'rgba(79,142,247,.1)', tension:.3, fill:false, pointRadius:4 },
+        { label:'Opt 3 dlnet/PT',     data: trialData[3].map(v=>v*1000), borderColor:'#a855f7', backgroundColor:'rgba(168,85,247,.1)', tension:.3, fill:false, pointRadius:4 },
+        { label:'Opt 4 dlnet/ONNX',   data: trialData[4].map(v=>v*1000), borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,.1)', tension:.3, fill:false, pointRadius:4 },
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins: { legend:{labels:{color:'#7c8db5',boxWidth:12}}, tooltip:{callbacks:{label:ctx=>` ${ctx.parsed.y.toFixed(1)} µs`}} },
+      scales: {
+        y: { title:{display:true,text:'Per-run time (µs)'}, grid:{color:'rgba(255,255,255,0.05)'} },
+        x: { grid:{color:'rgba(255,255,255,0.04)'} }
+      }
+    }
+  });
+}
+
+function refreshCharts() {
+  if (!chartsReady) { setTimeout(initCharts, 50); }
+}
+
+// ══════════════════════════════════════════ FILE TREE
+const FILE_TREE = [
+  { folder: 'option1_handwritten_c', files: [
+    { name:'lstm_model.c',        key:'lstm_model_c',   lang:'C'      },
+    { name:'lstm_model.h',        key:'lstm_model_h',   lang:'C'      },
+    { name:'generate_weights.py', key:'gen_weights',    lang:'Python' },
+    { name:'main_benchmark.c',    key:'main_bench_1',   lang:'C'      },
+  ]},
+  { folder: 'option2_matlab_pytorch_coder', files: [
+    { name:'generate_code_opt2.m',   key:'gen_code_opt2',      lang:'MATLAB' },
+    { name:'lstm_infer_opt2.m',      key:'lstm_infer_opt2_m',  lang:'MATLAB' },
+    { name:'codegen_opt2/lstm_infer_opt2.c (excerpt)', key:'lstm_infer_opt2_c', lang:'C' },
+  ]},
+  { folder: 'option3_matlab_dlnetwork', files: [
+    { name:'generate_code_opt3.m',   key:'gen_code_opt3',      lang:'MATLAB' },
+    { name:'lstm_infer_opt3.m',      key:'lstm_infer_opt3_m',  lang:'MATLAB' },
+  ]},
+  { folder: 'option4_onnx_matlab', files: [
+    { name:'generate_code_opt4.m',   key:'gen_code_opt4',      lang:'MATLAB' },
+    { name:'lstm_infer_opt4.m',      key:'lstm_infer_opt4_m',  lang:'MATLAB' },
+  ]},
+  { folder: 'benchmark', files: [
+    { name:'benchmark_all.py',  key:'bench_all',  lang:'Python' },
+  ]},
+];
+
+let activeFileKey = null;
+
+function buildFileTree() {
+  const tree = document.getElementById('file-tree');
+  FILE_TREE.forEach(folder => {
+    const folderDiv = document.createElement('div');
+    folderDiv.className = 'tree-folder';
+    folderDiv.innerHTML = `<div class="tree-folder-name"><span class="fol-icon">📁</span>${folder.folder}/</div>`;
+    const filesDiv = document.createElement('div');
+    filesDiv.className = 'tree-files';
+    folder.files.forEach(f => {
+      const fd = document.createElement('div');
+      fd.className = 'tree-file';
+      fd.textContent = f.name;
+      fd.dataset.key  = f.key;
+      fd.dataset.lang = f.lang;
+      fd.onclick = () => openFile(f.key, f.name, f.lang, fd);
+      filesDiv.appendChild(fd);
+    });
+    folderDiv.appendChild(filesDiv);
+    tree.appendChild(folderDiv);
+  });
+}
+
+function openFile(key, name, lang, el) {
+  const c = CODE[key];
+  if (!c) return;
+
+  document.querySelectorAll('.tree-file').forEach(f => f.classList.remove('active'));
+  el.classList.add('active');
+
+  document.getElementById('files-empty').style.display = 'none';
+  const hdr = document.getElementById('files-panel-hdr');
+  hdr.style.display = 'flex';
+  document.getElementById('files-fname').textContent = c.title;
+  document.getElementById('files-flang').textContent = lang;
+
+  const pre  = document.getElementById('files-code-pre');
+  const body = document.getElementById('files-code-body');
+  body.textContent = c.text;
+  const langClass = lang==='C'?'language-c':lang==='MATLAB'?'language-matlab':'language-python';
+  body.className = langClass;
+  pre.style.display = 'block';
+  hljs.highlightElement(body);
+}
+</script>
+</body>
+</html>

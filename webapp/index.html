@@ -31,37 +31,8 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
-/* ── LOGIN ──────────────────────────────────────────────────────── */
-#login-screen {
-  display: flex; align-items: center; justify-content: center;
-  min-height: 100vh;
-  background: radial-gradient(ellipse at 60% 30%, #1a1d4e 0%, #0f1117 70%);
-}
-.login-card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 16px; padding: 48px 40px; width: 380px; text-align: center;
-  box-shadow: 0 24px 64px rgba(0,0,0,0.6);
-}
-.login-logo { font-size: 2.5rem; margin-bottom: 8px; }
-.login-card h1 { font-size: 1.4rem; font-weight: 700; margin-bottom: 4px; color: var(--text); }
-.login-card p  { color: var(--muted); font-size: 0.85rem; margin-bottom: 32px; }
-.login-card input {
-  width: 100%; padding: 12px 16px; border-radius: 8px;
-  border: 1px solid var(--border); background: var(--bg);
-  color: var(--text); font-size: 1rem; margin-bottom: 12px;
-  outline: none; transition: border-color .2s;
-}
-.login-card input:focus { border-color: var(--accent); }
-.login-card button {
-  width: 100%; padding: 12px; border-radius: 8px; border: none;
-  background: var(--accent); color: #fff; font-size: 1rem;
-  font-weight: 600; cursor: pointer; transition: background .2s;
-}
-.login-card button:hover { background: #3a7de8; }
-.login-error { color: var(--red); font-size: 0.85rem; margin-top: 10px; display: none; }
-
 /* ── APP SHELL ──────────────────────────────────────────────────── */
-#app { display: none; flex-direction: column; min-height: 100vh; }
+#app { display: flex; flex-direction: column; min-height: 100vh; }
 .topbar {
   display: flex; align-items: center; gap: 16px;
   padding: 0 24px; height: 56px;
@@ -285,18 +256,6 @@ table.bench-table .mono { font-family: monospace; }
 </style>
 </head>
 <body>
-
-<!-- ══════════════════════════════════════════════════════════════════ LOGIN -->
-<div id="login-screen">
-  <div class="login-card">
-    <div class="login-logo">⚡</div>
-    <h1>LSTM CodeGen Explorer</h1>
-    <p>MATLAB Coder · C Code Generation · STM32 Benchmarks</p>
-    <input type="password" id="pw-input" placeholder="Enter password" onkeydown="if(event.key==='Enter')tryLogin()">
-    <button onclick="tryLogin()">Sign In</button>
-    <div class="login-error" id="login-error">Incorrect password</div>
-  </div>
-</div>
 
 <!-- ══════════════════════════════════════════════════════════════════ APP -->
 <div id="app">
@@ -749,35 +708,12 @@ table.bench-table .mono { font-family: monospace; }
 </div><!-- /app -->
 
 <script>
-// ══════════════════════════════════════════ PASSWORD
-const PW_HASH = "9b9af1c7d8e4c2f0a5b3d6e8f1a4c7d2"; // placeholder, replaced at runtime
-
-async function sha256(msg) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-}
-
-// Pre-compute hash of the correct password
-let correctHash = '';
-(async () => { correctHash = await sha256('lstmcode'); })();
-
-async function tryLogin() {
-  const val = document.getElementById('pw-input').value;
-  const h = await sha256(val);
-  if (h === correctHash) {
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('app').style.display = 'flex';
-    document.getElementById('app').style.flexDirection = 'column';
-    initCharts();
-    buildFileTree();
-    hljs.highlightAll();
-  } else {
-    const err = document.getElementById('login-error');
-    err.style.display = 'block';
-    setTimeout(() => err.style.display = 'none', 2500);
-    document.getElementById('pw-input').value = '';
-  }
-}
+// ══════════════════════════════════════════ INIT
+document.addEventListener('DOMContentLoaded', () => {
+  initCharts();
+  buildFileTree();
+  hljs.highlightAll();
+});
 
 // ══════════════════════════════════════════ NAVIGATION
 function showPage(id, btn) {
